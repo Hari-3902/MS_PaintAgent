@@ -1,14 +1,17 @@
 import json
 import pyautogui
-
+import subprocess
+import time	
+import os
 
 def load_calibration():
-	"""Load calibrated data (tools and optional canvas) from file."""
-	try:
-		with open('paint_calibration.json', 'r') as f:
-			return json.load(f)
-	except FileNotFoundError:
-		return None
+    try:
+        with open('paint_calibration.json', 'r') as f:
+            data = json.load(f)
+        return data
+    except (FileNotFoundError, json.JSONDecodeError):
+        print("⚠️ No valid calibration file found. Starting fresh...")
+        return {}
 
 
 def _extract_tools_and_canvas(calibration_data):
@@ -106,6 +109,122 @@ def calibrate_canvas():
 
 	print("\n✓ Canvas calibration saved to 'paint_calibration.json'")
 	return canvas
+#---------------Automated Calibration Tool -----------------#	
+
+# 1. DEFINE THE TOOL LOCATION FUNCTION
+def get_tool_coordinates(image_file):
+    """Searches the screen for the image and returns the center coordinates."""
+    # Ensure the image file exists
+    if not os.path.exists(image_file):
+        print(f"Error: The image file '{image_file}' was not found in the script directory.")
+        print("Please ensure you have saved a screenshot of the Pencil tool as 'pencil.png'.")
+        return None
+
+    try:
+        # Locate the image and return the Box object
+        # confidence=0.85 allows for minor visual differences
+        location = pyautogui.locateOnScreen(image_file, confidence=0.85)
+        
+        if location:
+            # Return the coordinates of the center of the found image
+            return pyautogui.center(location)
+        else:
+            print(f"Tool '{image_file}' not found on screen.")
+            return None
+    except Exception as e:
+        print(f"Error locating image: {e}")
+        return None
 
 
+def automated_calibration():
+    """
+    Automated calibration tool to find exact positions of Paint tools.
+    """
+    print("\n=== MS PAINT AUTOMATED TOOL CALIBRATION ===")
+    print("This will help you find the exact positions of Paint tools on your screen.")
+    print("\nInstructions:")
+    print("1. The script will open MS Paint automatically.")
+    print("2. It will then attempt to locate and click each tool based on provided images.")
+    print("3. Ensure that the tool images are clear and visible on the screen.\n")
+    
+    input("Press Enter to start the automated calibration...")
 
+    # 2. OPEN MS PAINT
+    print("Attempting to open MS Paint...")
+    try:
+        subprocess.Popen('mspaint')
+        time.sleep(3)
+        print("MS Paint opened. Proceeding to locate the Pencil tool.")
+    except FileNotFoundError:
+        print("ERROR: 'mspaint' command not found. Ensure you are on a Windows machine or adjust the command for your OS.")
+        exit()
+
+    # 3. LOCATE AND CLICK EACH TOOL
+    tools_to_calibrate = [
+        "pencil", "brush", "fill",       # paint tools
+        "line", "rectangle", "triangle", "circle",  # basic shapes
+        "diamond", "right_triangle", "polygon"      # advanced shapes
+    ]
+
+    calibrated_positions = {}
+    Failed_Tools = []
+
+    for tool in tools_to_calibrate:
+        IMAGE_FILE = f'./Tool_PNG/{tool}.png'
+        coords = get_tool_coordinates(IMAGE_FILE)
+        if coords:
+            pyautogui.click(coords)
+            print(f"✅ Success! {tool.capitalize()} clicked at: {coords}")
+            calibrated_positions[tool] = (int(coords.x), int(coords.y))
+            time.sleep(1)  # Brief pause between clicks
+        else:
+            Failed_Tools.append(tool)
+
+    # 4. SAVE CALIBRATION
+    existing = load_calibration()
+    if isinstance(existing, dict) and ("tools" in existing or "canvas" in existing):
+        existing["tools"] = calibrated_positions
+        to_write = existing
+    else:
+        # Legacy file was a flat dict of tools; migrate to structured format
+        to_write = {"tools": calibrated_positions}
+		
+    with open('paint_calibration.json', 'w') as f:
+        json.dump(to_write, f, indent=2)
+
+    print("\n✓ Calibration saved to 'paint_calibration.json'")
+    print("The script will now use these positions automatically.")
+    if Failed_Tools:
+        print("\n⚠️ The following tools could not be located automatically:")
+        for tool in Failed_Tools:
+              print(f" - {tool}")
+              print("Consider running the manual calibration for these tools.")
+    else:
+          print("\nAll tools were calibrated successfully!")
+    print("\n=== MS PAINT CANVAS CALIBRATION ===")
+    print("This will record the drawing page bounds so shapes stay inside it.")
+    TOP_LEFT_IMAGE = './Tool_PNG/Top_left.png'
+    BOTTOM_RIGHT_IMAGE = './Tool_PNG/Bottom_right.png'
+
+    print("Locating Top-Left corner of canvas...")
+    tl = get_tool_coordinates(TOP_LEFT_IMAGE)
+    
+    print("Locating Bottom-Right corner of canvas...")
+    br = get_tool_coordinates(BOTTOM_RIGHT_IMAGE)
+    # tl=int(top_left_coords.x), int(top_left_coords.y)
+    # br=int(bottom_right_coords.x), int(bottom_right_coords.y)		
+
+    if tl and br:
+        canvas = {"top_left": [int(tl.x), int(tl.y)], "bottom_right": [int(br.x), int(br.y)]}
+        existing = load_calibration()
+        if isinstance(existing, dict) and ("tools" in existing or "canvas" in existing):
+            existing["canvas"] = canvas
+            to_write = existing
+        elif isinstance(existing, dict):
+            to_write = {"tools": existing, "canvas": canvas}
+        else:
+            to_write = {"canvas": canvas}
+        with open('paint_calibration.json', 'w') as f:
+            json.dump(to_write, f, indent=2)
+        print(f"Canvas corners located in {canvas} and saved.")
+        print("\n✓ Canvas calibration saved to 'paint_calibration.json'")

@@ -1,3 +1,8 @@
 pyautogui
 google-genai
 python-dotenv
+Pillow
+pyscreeze
+opencv-python
+SpeechRecognition
+pyaudio

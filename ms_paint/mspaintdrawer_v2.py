@@ -1,8 +1,9 @@
 import sys
 import time
 
-from .calibration import calibrate_tools, calibrate_canvas
+from .calibration import calibrate_tools, calibrate_canvas,automated_calibration
 from .draw_shapes import draw_shapes
+
 
 def ms_paint_tool(shapes):
     if sys.platform != "win32":
@@ -25,9 +26,10 @@ if __name__ == "__main__":
     print("1. Calibrate tool positions (recommended first time)")
     print("2. Calibrate canvas bounds")
     print("3. Draw test shapes")
-    print("4. Exit")
+    print("4. Automated Calibration")
+    print("5. Exit")
 
-    choice = input("\nEnter your choice (1-4): ")
+    choice = input("\nEnter your choice (1-5): ")
 
     if choice == "1":
         calibrate_tools()   
@@ -106,5 +108,7 @@ if __name__ == "__main__":
         input("Press Enter to continue...")
         
         draw_shapes(test_shapes)
+    elif choice == "4":
+        automated_calibration() 
 
 
